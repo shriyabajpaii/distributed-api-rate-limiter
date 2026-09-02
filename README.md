@@ -38,7 +38,6 @@ graph TD
     E --> G[Resilience4j Circuit Breaker]
     G -->|Redis Healthy| H[Target API Resource]
     G -->|Redis Down| I[HTTP 503<br/>Service Fallback]
-
 Sliding Window Execution Mechanics
 When a request is evaluated:
 
@@ -64,8 +63,9 @@ Resilience: Resilience4j (Circuit Breaker & Fallback Handler)
 Containerization: Docker & Docker Compose
 
 Build Tool: Apache Maven
-Directory Structure
 
+Directory Structure
+Plaintext
 distributed-api-rate-limiter/
 ├── src/
 │   ├── main/
@@ -97,36 +97,68 @@ Git
 Docker Desktop or Homebrew (for running Redis locally)
 
 Local Setup & Installation
-Clone the Repository:git clone [https://github.com/](https://github.com/)<your-username>/distributed-api-rate-limiter.git
-cd distributed-api-rate-limiter
+Clone the Repository:
 
+Bash
+git clone [https://github.com/](https://github.com/)<your-username>/distributed-api-rate-limiter.git
+cd distributed-api-rate-limiter
 Start Redis Container / Service:
 
-Via Docker Compose:docker compose up -d
-Via Homebrew (macOS alternative):brew install redis
+Via Docker Compose:
+
+Bash
+docker compose up -d
+Via Homebrew (macOS alternative):
+
+Bash
+brew install redis
 brew services start redis
-Build and Launch the Spring Boot Server:./mvnw clean spring-boot:run
+Build and Launch the Spring Boot Server:
+
+Bash
+./mvnw clean spring-boot:run
 The server will start running at http://localhost:8080.
 
 Verification & API Usage
 Default Rate Limit Rule: Maximum 3 requests per 10-second window per User ID.
 
 1. Verification under Permitted Threshold
-Fire 3 rapid requests using curl:curl -i -H "X-USER-ID: testuser" http://localhost:8080/api/test
-Response:HTTP/1.1 200 OK
+Fire 3 rapid requests using curl:
+
+Bash
+curl -i -H "X-USER-ID: testuser" http://localhost:8080/api/test
+Response:
+
+HTTP
+HTTP/1.1 200 OK
 Content-Type: text/plain;charset=UTF-8
 
 Request successful for user: testuser
 2. Rate Limit Rejection Check
-Fire a 4th request within the 10-second window:curl -i -H "X-USER-ID: testuser" http://localhost:8080/api/test
-Response:HTTP/1.1 429 Too Many Requests
+Fire a 4th request within the 10-second window:
+
+Bash
+curl -i -H "X-USER-ID: testuser" http://localhost:8080/api/test
+Response:
+
+HTTP
+HTTP/1.1 429 Too Many Requests
 Content-Type: text/plain;charset=UTF-8
 
 Rate limit exceeded! Maximum 3 requests per 10 seconds allowed.
 3. Circuit Breaker Fallback Check
-Stop Redis to trigger system resilience handling:brew services stop redis  # or: docker stop redis_ratelimiter
-Send a request to the endpoint:curl -i -H "X-USER-ID: testuser" http://localhost:8080/api/test
-Response:HTTP/1.1 503 Service Unavailable
+Stop Redis to trigger system resilience handling:
+
+Bash
+brew services stop redis  # or: docker stop redis_ratelimiter
+Send a request to the endpoint:
+
+Bash
+curl -i -H "X-USER-ID: testuser" http://localhost:8080/api/test
+Response:
+
+HTTP
+HTTP/1.1 503 Service Unavailable
 Content-Type: text/plain;charset=UTF-8
 
 Redis or Downstream issue detected. Request handled by Resilience4j Fallback.
