@@ -7,18 +7,18 @@
 [![Docker](https://img.shields.io/badge/Docker-Supported-blue.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A high-throughput, distributed API rate limiter engineered with **Spring Boot**, **Redis**, and custom **Lua Scripts** using the **Sliding Window Log Algorithm**. The system is designed to protect backend microservices against traffic spikes and DDoS attacks while maintaining system availability through **Resilience4j Circuit Breakers**.
+A high-throughput, distributed API rate limiter built with **Spring Boot**, **Redis**, and custom **Lua scripts** using the **Sliding Window Log algorithm**. It protects backend microservices against traffic spikes and abuse while staying available during failures through **Resilience4j circuit breakers**.
 
 ---
 
 ## Key Features
 
-* **Distributed Rate Limiting:** Global request tracking across multi-instance microservice deployments via centralized Redis memory storage.
-* **Sliding Window Log Algorithm:** Precise timestamp tracking down to the millisecond using Redis Sorted Sets (`ZSET`), eliminating time-boundary request burst bugs common in fixed-window algorithms.
-* **Thread-Safe & Race Condition Free:** Enforces atomic operations inside Redis via native Lua scripts, guaranteeing sub-millisecond execution without application-level locking overhead.
-* **Fault Tolerance & Graceful Degradation:** Integrates Resilience4j Circuit Breaker patterns to fall back safely during Redis service outages or network failures.
-* **Multi-Tenant Key Isolation:** Restricts traffic independently on a per-user or per-API-key basis (`X-USER-ID` header routing).
-* **Container Ready:** Includes orchestration files (`docker-compose.yml`) for seamless deployment across local and production environments.
+- **Distributed Rate Limiting** — Global request tracking across multi-instance deployments via centralized Redis storage.
+- **Sliding Window Log Algorithm** — Millisecond-precise timestamp tracking with Redis Sorted Sets (`ZSET`), avoiding the boundary-burst problem of fixed-window algorithms.
+- **Thread-Safe & Race-Condition Free** — Atomic operations run inside Redis via native Lua scripts, with no application-level locking.
+- **Fault Tolerance & Graceful Degradation** — Resilience4j circuit breakers provide a safe fallback during Redis outages or network failures.
+- **Multi-Tenant Key Isolation** — Independent limits per user or API key, routed by the `X-USER-ID` header.
+- **Container Ready** — Ships with `docker-compose.yml` for quick local and production setup.
 
 ---
 
@@ -31,135 +31,171 @@ graph TD
     A[Incoming Request<br/>Header: X-USER-ID] --> B[Spring Boot Application]
     B --> C[Execute Lua Script]
     C --> D[Redis Engine<br/>ZSET Sliding Window]
-    
+
     D -->|Count < Limit| E[Allowed]
     D -->|Count >= Limit| F[HTTP 429<br/>Too Many Requests]
-    
+
     E --> G[Resilience4j Circuit Breaker]
     G -->|Redis Healthy| H[Target API Resource]
-    G -->|Redis Down| I[HTTP 503<br/>Service Fallback]Sliding Window Execution Mechanics
+    G -->|Redis Down| I[HTTP 503<br/>Service Fallback]
+```
+
+### Sliding Window Execution Mechanics
+
 When a request is evaluated:
 
-Prune: Removes obsolete timestamp entries older than currentTime - windowSize (ZREMRANGEBYSCORE).
+1. **Prune** — Remove timestamp entries older than `currentTime - windowSize` (`ZREMRANGEBYSCORE`).
+2. **Count** — Evaluate the active request volume within the sliding frame (`ZCARD`).
+3. **Decide**
+   - If `count < max_limit`: register the request timestamp (`ZADD`), reset the TTL (`EXPIRE`), and return `HTTP 200 OK`.
+   - If `count >= max_limit`: deny the request and return `HTTP 429 Too Many Requests`.
 
-Count: Evaluates the active request volume remaining within the sliding frame (ZCARD).
+---
 
-Decide:
+## Tech Stack
 
-If count < max_limit: Registers request timestamp (ZADD), resets TTL (EXPIRE), and yields HTTP 200 OK.
+| Layer | Technology |
+| --- | --- |
+| Language & Framework | Java 17, Spring Boot 3.2.3 (Spring Web, Spring Data Redis, Spring AOP) |
+| Data Store | Redis 7 (in-memory data structure store) |
+| Scripting | Lua (atomic execution inside Redis) |
+| Resilience | Resilience4j (circuit breaker & fallback handler) |
+| Containerization | Docker & Docker Compose |
+| Build Tool | Apache Maven |
 
-If count >= max_limit: Denies execution and yields HTTP 429 Too Many Requests.
+---
 
-Tech Stack
-Language & Framework: Java 17, Spring Boot 3.2.3 (Spring Web, Spring Data Redis, Spring AOP)
+## Directory Structure
 
-Data Store: Redis 7 (In-Memory Data Structure Store)
-
-Scripting: Lua (Atomic Execution inside Redis)
-
-Resilience: Resilience4j (Circuit Breaker & Fallback Handler)
-
-Containerization: Docker & Docker Compose
-
-Build Tool: Apache Maven
-
-Directory Structure
-Plaintext
-distributed-api-rate-limiter/
+```text
+rate-limiter/
 ├── src/
 │   ├── main/
 │   │   ├── java/com/example/rate_limiter/
 │   │   │   ├── config/
-│   │   │   │   └── RedisConfig.java          # Redis Script Loader Beans
+│   │   │   │   └── RedisConfig.java          # Redis script loader beans
 │   │   │   ├── controller/
-│   │   │   │   └── ApiController.java        # REST Controller & Circuit Breaker
+│   │   │   │   └── ApiController.java        # REST controller & circuit breaker
 │   │   │   ├── service/
-│   │   │   │   └── RateLimiterService.java   # Core Business Logic Execution
-│   │   │   └── RateLimiterApplication.java   # Spring Boot Main Entry Point
+│   │   │   │   └── RateLimiterService.java   # Core rate-limiting logic
+│   │   │   └── RateLimiterApplication.java   # Spring Boot entry point
 │   │   └── resources/
-│   │       ├── application.properties        # Server & Application Configs
+│   │       ├── application.properties        # Application configuration
 │   │       └── scripts/
-│   │           └── sliding_window.lua        # Atomic Sliding Window Script
-│   └── test/                                 # Unit & Integration Tests
-├── Dockerfile                                # Application Container Blueprint
-├── docker-compose.yml                        # Docker Multi-Container Configuration
-├── mvnw                                      # Maven Wrapper
-└── pom.xml                                   # Dependency Management File
-Getting Started
-Prerequisites
-Ensure the following tools are installed on your environment:
+│   │           └── sliding_window.lua        # Atomic sliding window script
+│   └── test/                                 # Unit & integration tests
+├── docker-compose.yml                        # Redis container configuration
+├── mvnw                                      # Maven wrapper
+└── pom.xml                                   # Dependency management
+```
 
-Java Development Kit (JDK 17+)
+---
 
-Git
+## Getting Started
 
-Docker Desktop or Homebrew (for running Redis locally)
+### Prerequisites
 
-Local Setup & Installation
-Clone the Repository:
+- Java Development Kit (JDK 17+)
+- Git
+- Docker Desktop, or Homebrew (for running Redis locally)
 
-Bash
-git clone https://github.com/<your-username>/distributed-api-rate-limiter.git
-cd distributed-api-rate-limiter
-Start Redis Container / Service:
+### Local Setup & Installation
 
-Via Docker Compose:
+1. **Clone the repository:**
 
-Bash
-docker compose up -d
-Via Homebrew (macOS alternative):
+   ```bash
+   git clone https://github.com/<your-username>/rate-limiter.git
+   cd rate-limiter
+   ```
 
-Bash
-brew install redis
-brew services start redis
-Build and Launch the Spring Boot Server:
+2. **Start Redis.**
 
-Bash
-./mvnw clean spring-boot:run
-The server will start running at http://localhost:8080.
+   Via Docker Compose:
 
-Verification & API Usage
-Default Rate Limit Rule: Maximum 3 requests per 10-second window per User ID.
+   ```bash
+   docker compose up -d
+   ```
 
-1. Verification under Permitted Threshold
-Fire 3 rapid requests using curl:
+   Or via Homebrew (macOS):
 
-Bash
+   ```bash
+   brew install redis
+   brew services start redis
+   ```
+
+3. **Build and launch the Spring Boot server:**
+
+   ```bash
+   ./mvnw clean spring-boot:run
+   ```
+
+   The server starts at `http://localhost:8080`.
+
+---
+
+## Verification & API Usage
+
+> **Default rule:** maximum **3 requests per 10-second window** per user ID.
+
+### 1. Requests within the limit
+
+Fire up to 3 rapid requests:
+
+```bash
 curl -i -H "X-USER-ID: testuser" http://localhost:8080/api/test
+```
+
 Response:
 
-HTTP
+```http
 HTTP/1.1 200 OK
 Content-Type: text/plain;charset=UTF-8
 
 Request successful for user: testuser
-2. Rate Limit Rejection Check
-Fire a 4th request within the 10-second window:
+```
 
-Bash
+### 2. Rate limit rejection
+
+Fire a 4th request within the same 10-second window:
+
+```bash
 curl -i -H "X-USER-ID: testuser" http://localhost:8080/api/test
+```
+
 Response:
 
-HTTP
+```http
 HTTP/1.1 429 Too Many Requests
 Content-Type: text/plain;charset=UTF-8
 
 Rate limit exceeded! Maximum 3 requests per 10 seconds allowed.
-3. Circuit Breaker Fallback Check
-Stop Redis to trigger system resilience handling:
+```
 
-Bash
-brew services stop redis  # or: docker stop redis_ratelimiter
-Send a request to the endpoint:
+### 3. Circuit breaker fallback
 
-Bash
+Stop Redis to trigger resilience handling:
+
+```bash
+brew services stop redis   # or: docker stop redis_ratelimiter
+```
+
+Send a request:
+
+```bash
 curl -i -H "X-USER-ID: testuser" http://localhost:8080/api/test
+```
+
 Response:
 
-HTTP
+```http
 HTTP/1.1 503 Service Unavailable
 Content-Type: text/plain;charset=UTF-8
 
-Redis or Downstream issue detected. Request handled by Resilience4j Fallback.
-License
-Distributed under the MIT License. See LICENSE for details.
+Redis or downstream issue detected. Request handled by Resilience4j fallback.
+```
+
+---
+
+## License
+
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.
