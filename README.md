@@ -37,8 +37,7 @@ graph TD
     
     E --> G[Resilience4j Circuit Breaker]
     G -->|Redis Healthy| H[Target API Resource]
-    G -->|Redis Down| I[HTTP 503<br/>Service Fallback]
-Sliding Window Execution Mechanics
+    G -->|Redis Down| I[HTTP 503<br/>Service Fallback]Sliding Window Execution Mechanics
 When a request is evaluated:
 
 Prune: Removes obsolete timestamp entries older than currentTime - windowSize (ZREMRANGEBYSCORE).
@@ -100,7 +99,7 @@ Local Setup & Installation
 Clone the Repository:
 
 Bash
-git clone [https://github.com/](https://github.com/)<your-username>/distributed-api-rate-limiter.git
+git clone https://github.com/<your-username>/distributed-api-rate-limiter.git
 cd distributed-api-rate-limiter
 Start Redis Container / Service:
 
